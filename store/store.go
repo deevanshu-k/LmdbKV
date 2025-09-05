@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"sync"
 
 	"github.com/bmatsuo/lmdb-go/lmdb"
@@ -12,8 +13,8 @@ import (
 var log_key = "STORE"
 
 type State struct {
-	Key   []byte `json:"key"`
-	Value []byte `json:"value"`
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 type Store struct {
@@ -77,7 +78,20 @@ func (s *Store) Subscribe(clientId string, key string) {
 		return
 	}
 
+	if slices.Contains(s.keyToClients[key], clientId) {
+		return
+	}
+
 	s.keyToClients[key] = append(s.keyToClients[key], clientId)
+
+	if value, err := s.Get([]byte(key)); err == nil {
+		if ch, ok := s.clientToChannel[clientId]; ok {
+			ch <- State{
+				Key:   key,
+				Value: string(value),
+			}
+		}
+	}
 }
 
 func (s *Store) Set(key []byte, value []byte) error {
@@ -110,8 +124,8 @@ func (s *Store) Set(key []byte, value []byte) error {
 	for _, client := range clients {
 		if ch, ok := s.clientToChannel[client]; ok {
 			ch <- State{
-				Key:   key,
-				Value: value,
+				Key:   string(key),
+				Value: string(value),
 			}
 		}
 	}
