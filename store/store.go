@@ -70,6 +70,18 @@ func (s *Store) RegisterUserChannel(clientId string, ch chan<- State) {
 	s.clientToChannel[clientId] = ch
 }
 
+func (s *Store) UnRegisterUser(clientId string) {
+	s.unSubscribeAll(clientId)
+
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	if ch, ok := s.clientToChannel[clientId]; ok {
+		close(ch)
+		delete(s.clientToChannel, clientId)
+	}
+}
+
 func (s *Store) Subscribe(clientId string, key string) {
 	s.m.Lock()
 	defer s.m.Unlock()
@@ -90,6 +102,34 @@ func (s *Store) Subscribe(clientId string, key string) {
 				Key:   key,
 				Value: string(value),
 			}
+		}
+	}
+}
+
+func (s *Store) UnSubscribe(clientId string, key string) {
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	if _, ok := s.clientToChannel[clientId]; !ok {
+		return
+	}
+
+	if i := slices.Index(s.keyToClients[key], clientId); i != -1 {
+		s.keyToClients[key] = append(s.keyToClients[key][:i], s.keyToClients[key][i+1:]...)
+	}
+}
+
+func (s *Store) unSubscribeAll(clientId string) {
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	if _, ok := s.clientToChannel[clientId]; !ok {
+		return
+	}
+
+	for key, clients := range s.keyToClients {
+		if i := slices.Index(clients, clientId); i != -1 {
+			s.keyToClients[key] = append(clients[:i], clients[i+1:]...)
 		}
 	}
 }

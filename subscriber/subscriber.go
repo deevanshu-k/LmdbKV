@@ -42,7 +42,11 @@ func handleConnection(conn net.Conn, s *store.Store) {
 
 	go func() {
 		for {
-			data := <-ch
+			data, ok := <-ch
+			if !ok {
+				break
+			}
+
 			log.Printf("[%s] %v", clientId, data)
 
 			if bytes, err := json.Marshal(data); err == nil {
@@ -55,7 +59,8 @@ func handleConnection(conn net.Conn, s *store.Store) {
 	for {
 		message, err := reader.ReadString('\n')
 		if err != nil {
-			log.Printf("[%s] Connection closed: %v", log_key, err)
+			log.Printf("[%s] [%s] Connection closed: %v", log_key, clientId, err)
+			s.UnRegisterUser(clientId)
 			return
 		}
 
@@ -69,6 +74,11 @@ func handleConnection(conn net.Conn, s *store.Store) {
 		/* SUB <string> */
 		if commands[0] == "SUB" {
 			s.Subscribe(clientId, commands[1])
+		}
+
+		/* UNSUB <string> */
+		if commands[0] == "UNSUB" {
+			s.UnSubscribe(clientId, commands[1])
 		}
 
 		// send back ACK
