@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/bmatsuo/lmdb-go/lmdb"
 )
@@ -11,7 +12,11 @@ import (
 var log_key = "STORE"
 
 type Store struct {
-	dbEnv *lmdb.Env
+	dbEnv           *lmdb.Env
+	clientToChannel map[string]chan<- []byte
+	keyToClients    map[string][]string
+	currentClientId int16
+	m               sync.Mutex
 }
 
 func NewStore(dbPath string) *Store {
@@ -36,8 +41,38 @@ func NewStore(dbPath string) *Store {
 	}
 
 	return &Store{
-		dbEnv: env,
+		dbEnv:           env,
+		clientToChannel: make(map[string]chan<- []byte),
+		keyToClients:    make(map[string][]string),
+		currentClientId: 1000,
 	}
+}
+
+func (s *Store) GetUniqueClient() string {
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	s.currentClientId = s.currentClientId + 1
+
+	return fmt.Sprintf("%d", s.currentClientId)
+}
+
+func (s *Store) RegisterUserChannel(clientId string, ch chan<- []byte) {
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	s.clientToChannel[clientId] = ch
+}
+
+func (s *Store) Subscribe(clientId string, key string) {
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	if _, ok := s.clientToChannel[clientId]; !ok {
+		return
+	}
+
+	s.keyToClients[key] = append(s.keyToClients[key], clientId)
 }
 
 func (s *Store) Set(key []byte, value []byte) error {
@@ -58,6 +93,19 @@ func (s *Store) Set(key []byte, value []byte) error {
 
 	if err := txn.Commit(); err != nil {
 		return fmt.Errorf("commit failed: %w", err)
+	}
+
+	s.m.Lock()
+	defer s.m.Unlock()
+	clients, ok := s.keyToClients[string(key)]
+	if !ok {
+		return nil
+	}
+
+	for _, client := range clients {
+		if ch, ok := s.clientToChannel[client]; ok {
+			ch <- value
+		}
 	}
 
 	return nil
