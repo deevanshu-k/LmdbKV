@@ -11,9 +11,14 @@ import (
 
 var log_key = "STORE"
 
+type State struct {
+	Key   []byte `json:"key"`
+	Value []byte `json:"value"`
+}
+
 type Store struct {
 	dbEnv           *lmdb.Env
-	clientToChannel map[string]chan<- []byte
+	clientToChannel map[string]chan<- State
 	keyToClients    map[string][]string
 	currentClientId int16
 	m               sync.Mutex
@@ -42,7 +47,7 @@ func NewStore(dbPath string) *Store {
 
 	return &Store{
 		dbEnv:           env,
-		clientToChannel: make(map[string]chan<- []byte),
+		clientToChannel: make(map[string]chan<- State),
 		keyToClients:    make(map[string][]string),
 		currentClientId: 1000,
 	}
@@ -57,7 +62,7 @@ func (s *Store) GetUniqueClient() string {
 	return fmt.Sprintf("%d", s.currentClientId)
 }
 
-func (s *Store) RegisterUserChannel(clientId string, ch chan<- []byte) {
+func (s *Store) RegisterUserChannel(clientId string, ch chan<- State) {
 	s.m.Lock()
 	defer s.m.Unlock()
 
@@ -104,7 +109,10 @@ func (s *Store) Set(key []byte, value []byte) error {
 
 	for _, client := range clients {
 		if ch, ok := s.clientToChannel[client]; ok {
-			ch <- value
+			ch <- State{
+				Key:   key,
+				Value: value,
+			}
 		}
 	}
 

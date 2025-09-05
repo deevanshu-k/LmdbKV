@@ -2,6 +2,7 @@ package subscriber
 
 import (
 	"bufio"
+	"encoding/json"
 	"log"
 	"net"
 	"strings"
@@ -34,7 +35,7 @@ func handleConnection(conn net.Conn, s *store.Store) {
 	defer conn.Close()
 	reader := bufio.NewReader(conn)
 
-	ch := make(chan []byte)
+	ch := make(chan store.State)
 	clientId := s.GetUniqueClient()
 
 	s.RegisterUserChannel(clientId, ch)
@@ -42,7 +43,12 @@ func handleConnection(conn net.Conn, s *store.Store) {
 	go func() {
 		for {
 			data := <-ch
-			log.Printf("[%s] %s", clientId, string(data))
+			log.Printf("[%s] %v", clientId, data)
+
+			if bytes, err := json.Marshal(data); err == nil {
+				bytes = append(bytes, '\n')
+				_, _ = conn.Write(bytes)
+			}
 		}
 	}()
 
