@@ -8,6 +8,8 @@ import (
 	"github.com/bmatsuo/lmdb-go/lmdb"
 )
 
+var log_key = "STORE"
+
 type Store struct {
 	dbEnv *lmdb.Env
 }
@@ -15,22 +17,22 @@ type Store struct {
 func NewStore(dbPath string) *Store {
 	env, err := lmdb.NewEnv()
 	if err != nil {
-		log.Fatalf("[STORE] Error while creating lmdb environment: %v", err)
+		log.Fatalf("[%s] Error while creating lmdb environment: %v", log_key, err)
 	}
 
 	if err := env.SetMapSize(1 << 30); err != nil { // 1GB
-		log.Fatalf("[STORE] Error setting map size: %v", err)
+		log.Fatalf("[%s] Error setting map size: %v", log_key, err)
 	}
 	if err := env.SetMaxDBs(1); err != nil {
-		log.Fatalf("[STORE] Error setting max dbs: %v", err)
+		log.Fatalf("[%s] Error setting max dbs: %v", log_key, err)
 	}
 
 	if err := os.MkdirAll(dbPath, 0755); err != nil {
-		log.Fatalf("[STORE] Failed to create db path: %v", err)
+		log.Fatalf("[%s] Failed to create db path: %v", log_key, err)
 	}
 
 	if err := env.Open(dbPath, 0, 0664); err != nil {
-		log.Fatalf("[STORE] Error opening LMDB env: %v", err)
+		log.Fatalf("[%s] Error opening LMDB env: %v", log_key, err)
 	}
 
 	return &Store{
