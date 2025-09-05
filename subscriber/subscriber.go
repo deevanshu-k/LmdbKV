@@ -47,7 +47,7 @@ func handleConnection(conn net.Conn, s *store.Store) {
 				break
 			}
 
-			log.Printf("[%s] %v", clientId, data)
+			log.Printf("[%s] [%s] %v", log_key, clientId, data)
 
 			if bytes, err := json.Marshal(data); err == nil {
 				bytes = append(bytes, '\n')

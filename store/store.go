@@ -46,6 +46,8 @@ func NewStore(dbPath string) *Store {
 		log.Fatalf("[%s] Error opening LMDB env: %v", log_key, err)
 	}
 
+	log.Printf("[%s] Connected to lmdb, path: %s", log_key, dbPath)
+
 	return &Store{
 		dbEnv:           env,
 		clientToChannel: make(map[string]chan<- State),
